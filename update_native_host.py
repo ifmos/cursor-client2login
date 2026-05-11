@@ -1,72 +1,87 @@
 #!/usr/bin/env python3
-import os
+"""更新已安装的原生主机 manifest 中的 allowed_origins
+
+典型用法:
+  python3 update_native_host.py <extension_id>           # 收紧到指定扩展 ID
+  python3 update_native_host.py --allow-all              # 恢复通配
+  python3 update_native_host.py --browser edge <id>      # 仅更新 Edge
+"""
+import argparse
 import json
+import os
 import sys
-import platform
+
+from install_native_host import (
+    BROWSERS,
+    MANIFEST_FILENAME,
+    detect_installed_browsers,
+    get_native_host_dir,
+)
 
 
-def get_chrome_native_host_dir():
-    """获取Chrome原生消息主机目录"""
-    system = platform.system()
-    
-    if system == "Darwin":
-        return os.path.expanduser("~/Library/Application Support/Google/Chrome/NativeMessagingHosts")
-    elif system == "Windows":
-        appdata = os.getenv("APPDATA")
-        return os.path.join(appdata, "Google", "Chrome", "NativeMessagingHosts")
-    elif system == "Linux":
-        return os.path.expanduser("~/.config/google-chrome/NativeMessagingHosts")
-
-
-def update_native_host_manifest(extension_id=None):
-    """更新原生主机清单文件"""
-    try:
-        host_dir = get_chrome_native_host_dir()
-        manifest_path = os.path.join(host_dir, "com.cursor.client.manage.json")
-        
-        if not os.path.exists(manifest_path):
-            print("❌ 原生主机清单文件不存在，请先运行安装命令")
-            return False
-        
-        # 读取现有清单
-        with open(manifest_path, 'r', encoding='utf-8') as f:
-            manifest = json.load(f)
-        
-        # 更新allowed_origins
-        if extension_id:
-            manifest["allowed_origins"] = [f"chrome-extension://{extension_id}/"]
-            print(f"✅ 更新为指定扩展ID: {extension_id}")
-        else:
-            manifest["allowed_origins"] = ["chrome-extension://*/"]
-            print("✅ 更新为通配符模式（允许所有扩展）")
-        
-        # 写回文件
-        with open(manifest_path, 'w', encoding='utf-8') as f:
-            json.dump(manifest, f, indent=2)
-        
-        print(f"📄 已更新清单文件: {manifest_path}")
-        print(f"📋 新的allowed_origins: {manifest['allowed_origins']}")
-        
-        return True
-        
-    except Exception as e:
-        print(f"❌ 更新失败: {e}")
+def update_for_browser(browser_key, allowed_origins):
+    host_dir = get_native_host_dir(browser_key)
+    if host_dir is None:
         return False
+    manifest_path = os.path.join(host_dir, MANIFEST_FILENAME)
+    if not os.path.exists(manifest_path):
+        print(f"⚠️  [{BROWSERS[browser_key]['name']}] 未找到清单，跳过")
+        return False
+
+    with open(manifest_path, "r", encoding="utf-8") as f:
+        manifest = json.load(f)
+
+    manifest["allowed_origins"] = allowed_origins
+
+    with open(manifest_path, "w", encoding="utf-8") as f:
+        json.dump(manifest, f, indent=2)
+
+    print(f"✅ [{BROWSERS[browser_key]['name']}] 已更新 → {allowed_origins}")
+    return True
 
 
 def main():
-    if len(sys.argv) > 1:
-        extension_id = sys.argv[1]
-        print(f"🔧 更新原生主机配置为扩展ID: {extension_id}")
-        update_native_host_manifest(extension_id)
+    parser = argparse.ArgumentParser(description="更新原生主机 allowed_origins")
+    parser.add_argument("extension_id", nargs="?", help="目标扩展 ID")
+    parser.add_argument("--allow-all", action="store_true", help="使用通配 allowed_origins")
+    parser.add_argument(
+        "--browser",
+        choices=list(BROWSERS.keys()) + ["all"],
+        default="all",
+        help="目标浏览器（默认更新所有已安装的）",
+    )
+    args = parser.parse_args()
+
+    if args.extension_id and args.allow_all:
+        parser.error("不能同时指定 extension_id 和 --allow-all")
+    if not args.extension_id and not args.allow_all:
+        parser.error("请提供 extension_id 或 --allow-all")
+
+    if args.extension_id:
+        allowed_origins = [f"chrome-extension://{args.extension_id}/"]
     else:
-        print("🔧 更新原生主机配置为通配符模式")
-        update_native_host_manifest()
-        print("\n💡 如果仍然无法工作，请:")
-        print("1. 在Chrome扩展页面找到你的扩展ID")
-        print("2. 运行: python3 update_native_host.py <扩展ID>")
-        print("3. 重启Chrome浏览器")
+        allowed_origins = ["chrome-extension://*/"]
+        print("⚠️  使用通配 allowed_origins，任何扩展都能调用此原生主机")
+
+    if args.browser == "all":
+        targets = detect_installed_browsers()
+        if not targets:
+            print("❌ 未检测到任何已安装的浏览器")
+            sys.exit(1)
+    else:
+        targets = [args.browser]
+
+    any_updated = False
+    for browser_key in targets:
+        if update_for_browser(browser_key, allowed_origins):
+            any_updated = True
+
+    if not any_updated:
+        print("❌ 没有更新到任何 manifest，请先运行 install_native_host.py install")
+        sys.exit(1)
+
+    print("\n💡 重启浏览器使更改生效")
 
 
 if __name__ == "__main__":
-    main() 
+    main()

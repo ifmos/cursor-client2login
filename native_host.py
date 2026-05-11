@@ -1,4 +1,4 @@
-#!/Users/user/.pyenv/versions/3.12.2/bin/python3
+#!/usr/bin/env python3
 import json
 import sys
 import struct
@@ -12,6 +12,7 @@ import secrets
 import hashlib
 import base64
 import requests
+from pathlib import Path
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, Callable, Tuple
 from abc import ABC, abstractmethod
@@ -157,11 +158,11 @@ class CursorDataManager:
                     "file_path": db_path
                 }
 
-            # 尝试连接数据库
+            # 尝试连接数据库（只读模式，避免影响 Cursor 自身的写入）
             conn = None
             try:
-                conn = sqlite3.connect(db_path, timeout=10.0)
-                conn.execute("PRAGMA journal_mode=WAL")  # 设置WAL模式以避免锁定问题
+                db_uri = Path(db_path).as_uri() + "?mode=ro"
+                conn = sqlite3.connect(db_uri, uri=True, timeout=5.0)
                 cursor = conn.cursor()
 
                 # 检查表是否存在 (注意：表名是ItemTable，首字母大写)

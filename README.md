@@ -93,36 +93,42 @@ graph TD
    cd cursor-client2login
    ```
 
-2. **安装到Chrome**
-   - 打开 `chrome://extensions/`
+2. **安装到 Chrome / Edge**
+   - 打开 `chrome://extensions/`（Edge 用 `edge://extensions/`）
    - 开启"开发者模式"
    - 点击"加载已解压的扩展程序"
    - 选择项目文件夹
 
-3. **安装原生主机**(推荐)
+3. **安装原生主机**（推荐，自动检测并安装到所有已安装的 Chrome / Edge）
    ```bash
-       # macOS/Linux
-    python3 install_native_host.py install
-   
-   # Windows
-   python install_native_host.py install
-   ```
+   # macOS/Linux
+   python3 install_native_host.py install --extension-id YOUR_EXTENSION_ID
 
-4. **更新原生主机配置扩展ID**
-   - 在Chrome中打开 `chrome://extensions/`
-   - 找到"Cursor Client2Login"扩展
-   - 复制扩展ID（如下图红框所示）
-   - 运行命令更新配置：
+   # Windows
+   python install_native_host.py install --extension-id YOUR_EXTENSION_ID
+
+   # 仅安装到指定浏览器
+   python3 install_native_host.py install --browser edge --extension-id YOUR_EXTENSION_ID
+
+   # 检测本机已安装的受支持浏览器
+   python3 install_native_host.py detect
+   ```
+   > 提示：未提供 `--extension-id` 时会回退到通配符模式（任何扩展都能调用原生主机），仅建议在调试场景使用。
+
+4. **如需更新扩展 ID**
    ```bash
    # macOS/Linux
    python3 update_native_host.py YOUR_EXTENSION_ID
-   
+
    # Windows
    python update_native_host.py YOUR_EXTENSION_ID
+
+   # 仅更新指定浏览器
+   python3 update_native_host.py --browser edge YOUR_EXTENSION_ID
    ```
    ![Chrome扩展管理页面 - 获取扩展ID](./assets/images/extension-id-guide.png)
 
-5. **重启Chrome浏览器**
+5. **重启浏览器**
 
 ### 🎯 首次使用
 
